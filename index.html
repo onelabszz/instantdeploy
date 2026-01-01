@@ -108,6 +108,11 @@
                 </span>
                 <input type="text" id="prompt-input" class="form-control border-secondary-subtle" 
                     placeholder="Describe a web page to generate (e.g., 'Modern Portfolio')..." autocomplete="off">
+                
+                <button class="btn btn-outline-secondary border-secondary-subtle" type="button" data-bs-toggle="modal" data-bs-target="#refineModal" title="Refine Prompt">
+                    <i class="bi bi-sliders"></i>
+                </button>
+                
                 <button class="btn btn-primary" type="submit" id="btn-generate">
                     Generate
                 </button>
@@ -160,6 +165,28 @@
             <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
             <h5 class="text-white">Generating Code...</h5>
             <p class="text-white-50">Asking Gemini to write HTML</p>
+        </div>
+    </div>
+
+    <!-- Refine Modal -->
+    <div class="modal fade" id="refineModal" tabindex="-1" aria-labelledby="refineModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-light border-secondary">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title" id="refineModalLabel">Refine Generation</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="refine-context" class="form-label text-white-50">Additional Instructions / Constraints</label>
+                        <textarea class="form-control bg-black text-light border-secondary" id="refine-context" rows="5" placeholder="E.g.,&#10;- Use a dark theme&#10;- Include a contact form&#10;- Use Bootstrap classes&#10;- Make it mobile responsive"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Save</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -238,6 +265,7 @@
         const loader = document.getElementById('loader');
         const aiForm = document.getElementById('ai-form');
         const promptInput = document.getElementById('prompt-input');
+        const refineContext = document.getElementById('refine-context');
         
         let isGenerating = false;
 
@@ -272,14 +300,14 @@
 
         // --- 3. View Handling ---
         window.setView = (mode) => {
-            workspace.className = \`main-container d-flex position-relative view-\${mode}\`;
+            workspace.className = `main-container d-flex position-relative view-${mode}`;
         };
 
         // --- 4. Share ---
         window.handleShare = async () => {
             const code = editor.value;
             const compressed = LZString.compressToEncodedURIComponent(code);
-            const newUrl = \`\${window.location.origin}\${window.location.pathname}#code=\${compressed}\`;
+            const newUrl = `${window.location.origin}${window.location.pathname}#code=${compressed}`;
             
             history.pushState(null, '', newUrl);
             
@@ -297,10 +325,10 @@
         aiForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const prompt = promptInput.value.trim();
+            const refineText = refineContext.value.trim();
+            
             if (!prompt || isGenerating) return;
 
-            // Using process.env.API_KEY as per system requirements.
-            // Note: In a pure static file usage without build, this variable must be manually replaced or injected.
             const apiKey = process.env.API_KEY; 
 
             if (!apiKey) {
@@ -314,23 +342,26 @@
                 
                 const ai = new GoogleGenAI({ apiKey: apiKey });
                 
-                const fullPrompt = \`
-                    You are an expert web developer.
-                    Task: Generate a single-file HTML5 web page based on: "\${prompt}".
-                    
-                    Current Code Context:
-                    \${editor.value.substring(0, 1000)}...
-                    
-                    Requirements:
+                let systemInstruction = "You are an expert web developer specializing in single-file HTML5/CSS/JS solutions.";
+                
+                let promptText = `Task: Generate a single-file HTML5 web page based on this request: "${prompt}".`;
+                
+                if (refineText) {
+                    promptText += `\n\nAdditional Constraints/Instructions:\n${refineText}`;
+                }
+
+                promptText += `\n\nCurrent Code Context:\n${editor.value.substring(0, 1000)}...`;
+                promptText += `\n\nRequirements:
                     1. Return ONLY valid HTML code. No markdown fences.
                     2. Include internal CSS in <style> for modern, high-quality aesthetics.
                     3. Use Vanilla JS for interactivity if needed.
-                \`;
+                    4. Ensure the layout is responsive (Bootstrap 5 via CDN is allowed if requested).`;
 
                 const response = await ai.models.generateContent({
                     model: 'gemini-3-flash-preview',
-                    contents: fullPrompt,
+                    contents: promptText,
                     config: {
+                        systemInstruction: systemInstruction,
                         thinkingConfig: { thinkingBudget: 0 }
                     }
                 });
@@ -338,10 +369,9 @@
                 let generatedText = response.text;
                 if (generatedText) {
                     // Cleanup potential markdown
-                    generatedText = generatedText.replace(/^\`\`\`html/, '').replace(/^\`\`\`/, '').replace(/\`\`\`$/, '').trim();
+                    generatedText = generatedText.replace(/^```html/, '').replace(/^```/, '').replace(/```$/, '').trim();
                     editor.value = generatedText;
                     updatePreview();
-                    promptInput.value = '';
                 }
             } catch (error) {
                 console.error("AI Error:", error);
