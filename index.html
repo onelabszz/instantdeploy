@@ -187,7 +187,7 @@
         <div class="spinner-border text-info" role="status">
             <span class="visually-hidden">Loading...</span>
         </div>
-        <h5 id="loading-text">Launching SheetRocket...</h5>
+        <h5 id="loading-text">Connecting to SheetRocket...</h5>
     </div>
 
     <!-- Header -->
@@ -199,8 +199,8 @@
                     <i class="bi bi-rocket-takeoff-fill fs-5"></i>
                 </div>
                 <div>
-                    <h6 class="m-0 fw-bold text-white text-uppercase" style="letter-spacing: 0.5px;">SheetRocket <span class="badge bg-secondary bg-opacity-50 border border-secondary border-opacity-50 ms-2" style="font-size: 0.6em; vertical-align: middle;">BETA</span></h6>
-                    <small class="text-secondary" style="font-size: 11px;" id="project-status">Powered by Google Sheets</small>
+                    <h6 class="m-0 fw-bold text-white text-uppercase" style="letter-spacing: 0.5px;">SheetRocket <span class="badge bg-secondary bg-opacity-50 border border-secondary border-opacity-50 ms-2" style="font-size: 0.6em; vertical-align: middle;">GITHUB EDITION</span></h6>
+                    <small class="text-secondary" style="font-size: 11px;" id="project-status">Powered by Google Sheets API</small>
                 </div>
             </div>
             
@@ -263,7 +263,8 @@
     <!-- App Logic -->
     <script>
         // --- CONFIGURATION ---
-        // Link Web App Anda (diperbarui sesuai request)
+        // PENTING: Ganti URL ini dengan URL Web App terbaru Anda setelah deploy di Apps Script
+        // Format: https://script.google.com/macros/s/..../exec
         const APP_URL = "https://script.google.com/macros/s/AKfycbw_NrRwHRt_x8UlsQCKIddB6WXjA_kodlh77OliuuW5MeQMsdoNzUuDfVmvPx5NLlFk7g/exec";
 
         // --- UTILITIES ---
@@ -311,13 +312,13 @@
                     <div class="card-body p-5">
                         <div class="icon-box"><i class="bi bi-rocket-takeoff"></i></div>
                         <h2 class="fw-bold text-dark mb-3">Hello, SheetRocket!</h2>
-                        <p class="text-secondary mb-4">This page is stored in a Google Sheet and deployed instantly. Edit me to build something cool!</p>
+                        <p class="text-secondary mb-4">This page is hosted on GitHub Pages but powered by Google Sheets!</p>
                         <div class="d-grid gap-2">
                             <button class="btn btn-primary btn-lg rounded-pill" onclick="alert('Ready for liftoff!')">Launch Action</button>
                         </div>
                     </div>
                     <div class="card-footer bg-light p-3 text-muted small">
-                        Built with Bootstrap 5 & Apps Script
+                        Built with Bootstrap 5 & Apps Script API
                     </div>
                 </div>
             </div>
@@ -352,7 +353,7 @@
             loadingOverlay.style.display = 'none';
         };
 
-        // --- GOOGLE SHEETS INTERACTION ---
+        // --- GOOGLE SHEETS INTERACTION (VIA FETCH API) ---
 
         const saveToCloud = () => {
             const code = editor.value;
@@ -362,84 +363,98 @@
             btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
             btn.disabled = true;
 
-            // Panggil fungsi Server-Side (Code.gs)
-            if (typeof google !== 'undefined' && google.script) {
-                google.script.run
-                    .withSuccessHandler((id) => {
-                        currentCloudId = id;
-                        
-                        // Update UI
-                        btn.innerHTML = originalBtnText;
-                        btn.disabled = false;
-                        projectStatus.textContent = "Saved to Sheet (ID: " + id + ")";
-                        projectStatus.classList.add('text-success');
-                        
-                        // Update URL (Browser History hanya untuk navigasi visual di iframe)
-                        const newUrl = updateQueryString('id', id);
-                        window.history.pushState({path: newUrl}, '', newUrl);
-                        
-                        showToast('Project saved securely to Google Sheets!');
-                    })
-                    .withFailureHandler((err) => {
-                        btn.innerHTML = originalBtnText;
-                        btn.disabled = false;
-                        console.error(err);
-                        showToast('Failed to save: ' + err.message, true);
-                    })
-                    .saveProject(code);
-            } else {
-                // Fallback untuk local dev testing
-                setTimeout(() => {
+            // Prepare Payload
+            // Note: Google Apps Script Web Apps require POST data to be sent slightly differently depending on setup,
+            // but for JSON payloads, using text/plain prevents CORS preflight issues in some browser/GAS combos.
+            // GAS will parse e.postData.contents.
+            const payload = JSON.stringify({
+                action: 'save',
+                html: code
+            });
+
+            fetch(APP_URL, {
+                method: 'POST',
+                mode: 'no-cors', // Hack: GAS doPost redirects which fetch follows but opaque. 
+                                 // However, for retrieving the ID, we ideally need CORS working or return JSONP.
+                                 // Since we need the ID back, we try standard CORS. 
+                                 // IF CORS FAILS: Ensure "Who has access" is "Anyone".
+                headers: {
+                    'Content-Type': 'text/plain;charset=utf-8', 
+                },
+                body: payload
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    currentCloudId = data.id;
+                    
+                    // Update UI
                     btn.innerHTML = originalBtnText;
                     btn.disabled = false;
-                    showToast('Simulation: Saved (Local Mode)', false);
-                    currentCloudId = "LOCAL_DEV";
-                    const newUrl = updateQueryString('id', 'LOCAL_DEV');
+                    projectStatus.textContent = "Saved to Sheet (ID: " + data.id + ")";
+                    projectStatus.classList.add('text-success');
+                    
+                    // Update URL
+                    const newUrl = updateQueryString('id', data.id);
                     window.history.pushState({path: newUrl}, '', newUrl);
-                }, 1000);
-            }
+                    
+                    showToast('Project saved to Google Sheets!');
+                } else {
+                    throw new Error(data.message || 'Unknown error');
+                }
+            })
+            .catch(err => {
+                // Fetch to GAS often fails JSON parsing due to 302 redirect for visual HTML
+                // But for ContentService JSON, it should work if deployed correctly.
+                btn.innerHTML = originalBtnText;
+                btn.disabled = false;
+                console.error(err);
+                showToast('Save failed. Check console. Ensure API is public.', true);
+            });
         };
 
         const loadFromCloud = (id, isViewMode) => {
-            showLoading("Retrieving from Google Sheets...");
+            showLoading("Fetching from Google Database...");
             
-            if (typeof google !== 'undefined' && google.script) {
-                google.script.run
-                    .withSuccessHandler((content) => {
-                        if (content) {
-                            if (isViewMode) {
-                                // Direct render for view mode
-                                document.open();
-                                document.write(content);
-                                document.close();
-                                hideLoading(); // Might not be seen if doc is replaced
-                            } else {
-                                // Editor mode
-                                editor.value = content;
-                                currentCloudId = id;
-                                projectStatus.textContent = "Loaded from Sheet (ID: " + id + ")";
-                                updatePreview();
-                                hideLoading();
-                                document.body.style.display = 'flex';
-                            }
-                        } else {
-                            hideLoading();
-                            alert("Project ID not found in database.");
-                            document.body.style.display = 'flex';
-                        }
-                    })
-                    .withFailureHandler((err) => {
+            // Append Query Params
+            const fetchUrl = `${APP_URL}?action=load&id=${id}`;
+
+            fetch(fetchUrl)
+            .then(response => response.json())
+            .then(data => {
+                 if (data.status === 'success') {
+                    const content = data.content;
+                    if (isViewMode) {
+                        document.open();
+                        document.write(content);
+                        document.close();
                         hideLoading();
-                        showToast("Error loading project: " + err.message, true);
+                    } else {
+                        editor.value = content;
+                        currentCloudId = id;
+                        projectStatus.textContent = "Loaded from Sheet (ID: " + id + ")";
+                        updatePreview();
+                        hideLoading();
                         document.body.style.display = 'flex';
-                    })
-                    .loadProject(id);
-            } else {
+                    }
+                } else {
+                    throw new Error(data.message || 'Project not found');
+                }
+            })
+            .catch(err => {
                 hideLoading();
-                editor.value = "<!-- Local Dev Mode: Cannot load real data -->\n" + DEFAULT_CODE;
-                updatePreview();
-                document.body.style.display = 'flex';
-            }
+                console.error(err);
+                // Fallback if network fails
+                if (!isViewMode) {
+                    showToast("Failed to load project: " + err.message, true);
+                    editor.value = DEFAULT_CODE;
+                    updatePreview();
+                    document.body.style.display = 'flex';
+                } else {
+                    document.body.innerHTML = `<div style="color:white;text-align:center;padding:50px">Error: ${err.message}</div>`;
+                    document.body.style.display = 'block';
+                }
+            });
         };
 
         // --- URL HELPERS ---
@@ -447,17 +462,11 @@
         const updateQueryString = (key, value) => {
             const url = new URL(window.location.href);
             url.searchParams.set(key, value);
-            // Remove hash if we are switching to Cloud ID system to avoid confusion
             if(key === 'id') url.hash = ''; 
             return url.toString();
         };
 
         const getBaseUrl = () => {
-            // Gunakan APP_URL yang di-hardcode jika ada (Best Practice untuk GAS)
-            if (APP_URL && APP_URL.startsWith('http')) {
-                return APP_URL;
-            }
-            // Fallback ke window.location (biasanya URL sandbox)
             return window.location.href.split('?')[0].split('#')[0];
         };
 
@@ -465,20 +474,17 @@
             const baseUrl = getBaseUrl();
             let finalUrl = baseUrl;
             
-            // Prioritize Cloud ID link if available
             if (currentCloudId) {
                  finalUrl = `${baseUrl}?id=${currentCloudId}`;
             } else {
-                // Fallback to Hash encoding if not saved
                 const hash = encode(editor.value);
                 finalUrl = `${baseUrl}#${hash}`;
-                // Set hash locally for user visual feedback
                 window.location.hash = hash;
             }
 
             try {
                 await navigator.clipboard.writeText(finalUrl);
-                showToast('Link copied: ' + (currentCloudId ? 'SheetRocket Link' : 'Hash Link'));
+                showToast('Link copied: ' + (currentCloudId ? 'Cloud Link' : 'Hash Link'));
             } catch (err) {
                 prompt("Copy this link:", finalUrl);
             }
@@ -489,10 +495,8 @@
             let url;
             
             if (currentCloudId) {
-                // Deploy via ID (Clean URL)
                 url = `${baseUrl}?view=1&id=${currentCloudId}`;
             } else {
-                // Deploy via Hash
                 const hash = encode(editor.value);
                 url = `${baseUrl}?view=1#${hash}`;
             }
@@ -507,13 +511,13 @@
             const id = params.get('id');
             const hash = window.location.hash;
 
-            // Scenario 1: Load from Cloud ID (View or Edit)
+            // 1. Cloud Mode (ID exists)
             if (id) {
                 loadFromCloud(id, viewMode);
                 return;
             }
 
-            // Scenario 2: Legacy View Mode (Hash)
+            // 2. Legacy Hash Mode (View)
             if (viewMode && hash) {
                 const decoded = decode(hash);
                 if (decoded) {
@@ -524,7 +528,7 @@
                 }
             }
             
-            // Scenario 3: Legacy Edit Mode (Hash)
+            // 3. Legacy Hash Mode (Edit)
             if (hash && hash.length > 1) {
                 hideLoading();
                 const decoded = decode(hash);
@@ -534,7 +538,7 @@
                 return;
             }
 
-            // Scenario 4: New Project
+            // 4. New Project
             hideLoading();
             editor.value = DEFAULT_CODE;
             updatePreview();
