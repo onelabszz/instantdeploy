@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SheetRocket - Cloud Editor</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Google Fonts (Inter & JetBrains Mono) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+    <style>
+        /* --- MATERIAL YOU (M3) THEME VARIABLES --- */
+        :root {
+            /* Palette: M3 Dark High Contrast */
+            --md-sys-color-background: #111111; /* Very dark grey, almost black */
+            --md-sys-color-surface: #1e1f20;     /* Panel background */
+            --md-sys-color-surface-variant: #2d2e2f; /* Borders/Headers */
+            
+            --md-sys-color-primary: #d0bcff;     /* Lilac pastel for primary actions */
+            --md-sys-color-on-primary: #381e72;  /* Text on primary */
+            
+            --md-sys-color-secondary-container: #334455; /* For buttons/toggles */
+            --md-sys-color-on-secondary-container: #cce5ff;
+            
+            --md-sys-color-success: #b6f2ba;     /* Pastel Green */
+            --md-sys-color-on-success: #0c3b10;
+            
+            --md-sys-color-text-main: #e3e3e3;
+            --md-sys-color-text-sub: #c4c7c5;
+            
+            --radius-lg: 24px;
+            --radius-md: 16px;
+            --radius-sm: 8px;
+        }
+
+        body {
+            background-color: var(--md-sys-color-background);
+            font-family: 'Inter', sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            display: none; /* Hidden until loaded */
+            flex-direction: column;
+            color: var(--md-sys-color-text-main);
+        }
+
+        /* --- NAVBAR --- */
+        .navbar {
+            background-color: var(--md-sys-color-background) !important;
+            padding: 1rem 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .brand-pill {
+            background-color: var(--md-sys-color-surface-variant);
+            color: var(--md-sys-color-text-main);
+            padding: 8px 16px;
+            border-radius: 50px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+        }
+
+        .brand-icon {
+            color: var(--md-sys-color-primary);
+        }
+
+        /* --- BUTTONS (Material You Style) --- */
+        .btn {
+            border-radius: 50px !important; /* Pill shape */
+            font-weight: 500;
+            padding: 8px 20px;
+            border: none;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+        }
+        .btn-primary:hover {
+            background-color: #e8def8; /* Lighter lilac */
+            color: var(--md-sys-color-on-primary);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            transform: translateY(-1px);
+        }
+
+        .btn-surface {
+            background-color: var(--md-sys-color-surface-variant);
+            color: var(--md-sys-color-text-sub);
+        }
+        .btn-surface:hover {
+            background-color: #3f4042;
+            color: var(--md-sys-color-text-main);
+        }
+
+        .btn-success-custom {
+            background-color: var(--md-sys-color-success);
+            color: var(--md-sys-color-on-success);
+        }
+        .btn-success-custom:hover {
+            background-color: #d1f8d4;
+            color: var(--md-sys-color-on-success);
+        }
+
+        .btn-icon-only {
+            padding: 8px;
+            width: 40px;
+            height: 40px;
+            justify-content: center;
+            border-radius: 50%;
+        }
+
+        /* --- WORKSPACE LAYOUT --- */
+        .workspace {
+            flex: 1;
+            display: flex;
+            padding: 0 1rem 1rem 1rem; /* Padding around the workspace */
+            gap: 1rem;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--md-sys-color-surface);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            position: relative;
+            /* Default: show both on desktop */
+        }
+
+        /* Editor Styling */
+        .pane-header {
+            padding: 12px 20px;
+            background-color: var(--md-sys-color-surface);
+            color: var(--md-sys-color-text-sub);
+            font-size: 0.85rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        #code-editor {
+            flex: 1;
+            background-color: var(--md-sys-color-surface);
+            color: #e0e0e0;
+            border: none;
+            resize: none;
+            padding: 1.5rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            outline: none;
+        }
+        #code-editor::placeholder { color: #555; }
+
+        /* Preview Styling */
+        .preview-pane {
+            background-color: #ffffff; /* Preview is usually white content */
+        }
+        
+        .preview-container {
+            flex: 1;
+            background-color: #eef0f2; /* Light grey backdrop for devices */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            padding: 20px;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: white;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+
+        /* View Mode Fullscreen */
+        #view-mode-container {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 5000;
+            background: white;
+            display: none;
+        }
+        
+        /* --- DEVICE FRAMES --- */
+        .device-mobile { width: 375px !important; height: 700px !important; border-radius: 20px; }
+        .device-tablet { width: 768px !important; height: 100% !important; border-radius: 12px; }
+        .device-desktop { width: 100% !important; height: 100% !important; border-radius: 0; }
+
+        /* --- MOBILE TABS --- */
+        .mobile-tabs {
+            display: none; /* Hidden on desktop */
+            padding: 0 1rem;
+            margin-bottom: 1rem;
+        }
+        .tab-btn {
+            background: transparent;
+            color: var(--md-sys-color-text-sub);
+            border: 1px solid var(--md-sys-color-surface-variant);
+            border-radius: 50px;
+            padding: 6px 16px;
+            font-size: 0.9rem;
+            margin-right: 8px;
+        }
+        .tab-btn.active {
+            background: var(--md-sys-color-secondary-container);
+            color: var(--md-sys-color-on-secondary-container);
+            border-color: transparent;
+        }
+
+        /* --- RESPONSIVE --- */
+        @media (max-width: 768px) {
+            .navbar { padding: 0.75rem 1rem; }
+            .workspace { padding: 0; gap: 0; flex-direction: column; }
+            .pane { border-radius: 0; display: none; /* Controlled by JS */ }
+            .pane.active { display: flex; }
+            .mobile-tabs { display: flex; }
+            .preview-container { padding: 0; background: white; }
+            .device-controls { display: none; }
+            iframe { box-shadow: none; }
+            
+            /* Adjust buttons for mobile */
+            .btn span { display: none; } /* Hide text on small screens for secondary buttons */
+            .btn-primary span { display: inline; } /* Keep save text */
+        }
+
+        /* --- UTILS --- */
+        .autosave-indicator { font-size: 0.75rem; color: #666; transition: color 0.3s; display: flex; align-items: center; gap: 4px; }
+        .autosave-indicator.saved { color: var(--md-sys-color-success); }
+        .autosave-indicator.saving { color: #ffc107; }
+
+        #loading-overlay {
+            background-color: var(--md-sys-color-background);
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 2000; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; color: white;
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0"
+  }
+}
+</script>
+</head>
+<body>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay">
+        <div class="spinner-border text-light mb-3" role="status"></div>
+        <div style="font-family: 'Inter'; font-weight: 500; letter-spacing: 1px;">INITIALIZING...</div>
+    </div>
+
+    <!-- View Mode Container (Fullscreen Iframe) -->
+    <div id="view-mode-container">
+        <iframe id="view-mode-frame"></iframe>
+    </div>
+
+    <!-- Main Editor Interface -->
+    <div id="editor-interface" style="display: flex; flex-direction: column; height: 100%;">
+        
+        <!-- Header -->
+        <nav class="navbar">
+            <div class="container-fluid p-0 d-flex justify-content-between">
+                <div class="brand-pill">
+                    <i class="bi bi-rocket-takeoff-fill brand-icon"></i>
+                    <span>SheetRocket</span>
+                </div>
+                
+                <div class="d-flex gap-2">
+                    <!-- Copy Link -->
+                    <button onclick="copyDeployLink()" class="btn btn-surface" title="Copy Deploy Link">
+                        <i class="bi bi-link-45deg fs-5"></i> <span class="d-none d-md-inline">Copy Link</span>
+                    </button>
+
+                    <!-- Deploy -->
+                    <button onclick="deployPage()" class="btn btn-surface" title="Open Live View">
+                        <i class="bi bi-box-arrow-up-right"></i> <span class="d-none d-md-inline">Deploy</span>
+                    </button>
+
+                    <!-- Save -->
+                    <button onclick="saveToCloud()" class="btn btn-primary" id="btn-save" title="Save to Google Sheets">
+                        <i class="bi bi-cloud-arrow-up-fill"></i> <span>Save</span>
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Mobile Tabs -->
+        <div class="mobile-tabs">
+            <button class="tab-btn active" onclick="switchTab('editor')"><i class="bi bi-code-slash"></i> Editor</button>
+            <button class="tab-btn" onclick="switchTab('preview')"><i class="bi bi-eye"></i> Preview</button>
+        </div>
+
+        <!-- Main Workspace -->
+        <div class="workspace">
+            <!-- Editor Pane -->
+            <div class="pane active" id="pane-editor">
+                <div class="pane-header">
+                    <span style="font-family:'JetBrains Mono'">index.html</span>
+                    <div class="d-flex align-items-center gap-3">
+                        <span id="autosave-status" class="autosave-indicator">
+                            <i class="bi bi-check-circle-fill"></i> Ready
+                        </span>
+                    </div>
+                </div>
+                <textarea id="code-editor" spellcheck="false" placeholder="<!-- Start coding... -->"></textarea>
+            </div>
+
+            <!-- Preview Pane -->
+            <div class="pane preview-pane" id="pane-preview">
+                <div class="pane-header" style="background: #fff; border-bottom: 1px solid #eee;">
+                    <div class="text-dark fw-bold d-flex align-items-center gap-2">
+                        <i class="bi bi-phone-landscape"></i> Preview
+                    </div>
+                    
+                    <!-- Device Controls (Desktop only) -->
+                    <div class="btn-group btn-group-sm device-controls">
+                        <button class="btn btn-sm btn-outline-secondary border-0 text-dark" onclick="setPreviewMode('desktop')"><i class="bi bi-pc-display"></i></button>
+                        <button class="btn btn-sm btn-outline-secondary border-0 text-dark" onclick="setPreviewMode('tablet')"><i class="bi bi-tablet"></i></button>
+                        <button class="btn btn-sm btn-outline-secondary border-0 text-dark" onclick="setPreviewMode('mobile')"><i class="bi bi-phone"></i></button>
+                    </div>
+                </div>
+                <div class="preview-container">
+                    <iframe id="preview-frame" class="device-desktop" sandbox="allow-scripts allow-modals allow-forms allow-popups allow-same-origin"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="position-fixed bottom-0 start-50 translate-middle-x p-4" style="z-index: 1050">
+        <div id="toast-msg" class="toast align-items-center text-white bg-dark border-0 shadow-lg" style="border-radius: 50px;" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex px-2">
+                <div class="toast-body d-flex align-items-center gap-2" id="toast-body-text">
+                    Action successful!
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- App Logic -->
+    <script>
+        // --- CONFIGURATION ---
+        const APP_URL = "https://script.google.com/macros/s/AKfycbw_NrRwHRt_x8UlsQCKIddB6WXjA_kodlh77OliuuW5MeQMsdoNzUuDfVmvPx5NLlFk7g/exec";
+        const AUTOSAVE_KEY = "sheetrocket_autosave_content";
+
+        // --- ELEMENTS ---
+        let editor, preview, autosaveStatus, toastEl, bsToast, currentCloudId = null, autosaveTimer;
+        
+        // --- CORE LOGIC ---
+
+        const updatePreview = () => {
+            if (!editor) return;
+            const code = editor.value;
+            preview.srcdoc = code;
+            triggerAutosave();
+        };
+
+        const triggerAutosave = () => {
+            if (autosaveStatus) {
+                autosaveStatus.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
+                autosaveStatus.className = 'autosave-indicator saving';
+            }
+            clearTimeout(autosaveTimer);
+            autosaveTimer = setTimeout(() => {
+                localStorage.setItem(AUTOSAVE_KEY, editor.value);
+                if (autosaveStatus) {
+                    autosaveStatus.innerHTML = '<i class="bi bi-check-circle-fill"></i> Saved';
+                    autosaveStatus.className = 'autosave-indicator saved';
+                }
+            }, 1000);
+        };
+
+        // --- UI ACTIONS ---
+
+        const switchTab = (tab) => {
+            const editorPane = document.getElementById('pane-editor');
+            const previewPane = document.getElementById('pane-preview');
+            const tabs = document.querySelectorAll('.tab-btn');
+            
+            tabs.forEach(t => t.classList.remove('active'));
+            
+            if (tab === 'editor') {
+                editorPane.classList.add('active');
+                previewPane.classList.remove('active');
+                tabs[0].classList.add('active');
+            } else {
+                editorPane.classList.remove('active');
+                previewPane.classList.add('active');
+                tabs[1].classList.add('active');
+                // Refresh preview when switching to it to ensure rendering size
+                updatePreview();
+            }
+        };
+
+        const setPreviewMode = (mode) => {
+            const frame = document.getElementById('preview-frame');
+            frame.className = ''; 
+            if (mode === 'mobile') frame.classList.add('device-mobile');
+            else if (mode === 'tablet') frame.classList.add('device-tablet');
+            else frame.classList.add('device-desktop');
+        };
+
+        const showToast = (msg, type = 'success') => {
+            const tBody = document.getElementById('toast-body-text');
+            const tEl = document.getElementById('toast-msg');
+            tBody.textContent = msg;
+            
+            // Material Colors for Toast
+            tEl.className = `toast align-items-center text-white border-0 shadow-lg ${type === 'error' ? 'bg-danger' : 'bg-dark'}`;
+            tEl.style.borderRadius = "50px";
+            
+            if (bsToast) bsToast.show();
+        };
+
+        // --- CLOUD ACTIONS ---
+
+        const saveToCloud = () => {
+            const code = editor.value;
+            const btn = document.getElementById('btn-save');
+            const originalHTML = btn.innerHTML;
+            
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            btn.disabled = true;
+
+            fetch(APP_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'save', html: code })
+            })
+            .then(res => res.json())
+            .then(data => handleSaveSuccess(data, btn, originalHTML))
+            .catch(() => {
+                // Handling no-cors opaque response (likely success but can't read ID immediately without CORS)
+                // In a real CORS setup, we read data.id. Here we assume success if no network error.
+                // We simulate a delay to check if user needs to "wait" for data propagation.
+                setTimeout(() => {
+                    btn.innerHTML = originalHTML;
+                    btn.disabled = false;
+                    showToast('Saved! (Check CORS if ID missing)', 'success');
+                }, 1000);
+            });
+        };
+
+        const handleSaveSuccess = (data, btn, originalHTML) => {
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+            if (data.status === 'success') {
+                currentCloudId = data.id;
+                const newUrl = updateQueryString('id', data.id);
+                window.history.pushState({path: newUrl}, '', newUrl);
+                showToast(`Saved! ID: ${data.id}`);
+            } else {
+                showToast('Error saving project', 'error');
+            }
+        };
+
+        const loadFromCloud = (id) => {
+            fetch(`${APP_URL}?action=load&id=${id}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    editor.value = data.content;
+                    currentCloudId = id;
+                    updatePreview();
+                    document.getElementById('loading-overlay').style.display = 'none';
+                    document.body.style.display = 'flex';
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById('loading-overlay').style.display = 'none';
+                document.body.style.display = 'flex';
+                showToast('Failed to load project', 'error');
+            });
+        };
+
+        // --- DEPLOY & LINK LOGIC ---
+
+        const getDeployUrl = () => {
+            const baseUrl = window.location.href.split('?')[0].split('#')[0];
+            if (currentCloudId) {
+                return `${baseUrl}?view=1&id=${currentCloudId}`;
+            }
+            // Hash fallback
+            const encoded = btoa(unescape(encodeURIComponent(editor.value)));
+            return `${baseUrl}?view=1#${encoded}`;
+        };
+
+        const deployPage = () => {
+            if (!confirm('Deploy current version?')) return;
+            const url = getDeployUrl();
+            window.open(url, '_blank');
+        };
+
+        const copyDeployLink = async () => {
+            const url = getDeployUrl();
+            try {
+                await navigator.clipboard.writeText(url);
+                showToast('Deploy link copied to clipboard!');
+            } catch (err) {
+                prompt("Copy this link:", url);
+            }
+        };
+
+        // --- VIEW MODE RENDERER ---
+        
+        const enterViewMode = (content, id) => {
+            // Hide editor, show view container
+            document.getElementById('editor-interface').style.display = 'none';
+            document.getElementById('loading-overlay').style.display = 'none';
+            const viewContainer = document.getElementById('view-mode-container');
+            const viewFrame = document.getElementById('view-mode-frame');
+            
+            viewContainer.style.display = 'block';
+            document.body.style.display = 'block'; // Ensure body is visible
+            
+            // Set content
+            viewFrame.srcdoc = content;
+        };
+
+        // --- UTILS ---
+        const updateQueryString = (key, value) => {
+            const url = new URL(window.location.href);
+            url.searchParams.set(key, value);
+            if(key === 'id') url.hash = ''; 
+            return url.toString();
+        };
+
+        const decodeHash = (hash) => {
+            try { return decodeURIComponent(escape(atob(hash.replace(/^#/, '')))); } catch { return ''; }
+        };
+
+        // --- INIT ---
+        window.addEventListener('load', () => {
+            editor = document.getElementById('code-editor');
+            preview = document.getElementById('preview-frame');
+            autosaveStatus = document.getElementById('autosave-status');
+            toastEl = document.getElementById('toast-msg');
+            
+            if (typeof bootstrap !== 'undefined') bsToast = new bootstrap.Toast(toastEl);
+            
+            if(editor) editor.addEventListener('input', updatePreview);
+
+            // Params
+            const params = new URLSearchParams(window.location.search);
+            const viewMode = params.get('view') === '1';
+            const id = params.get('id');
+            const hash = window.location.hash;
+
+            const DEFAULT_CODE = `<!DOCTYPE html>
+<html>
+<head>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>body{padding:40px;background:#f8f9fa;text-align:center}</style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="display-4">Hello World!</h1>
+    <p>Deployed via SheetRocket.</p>
+    <button class="btn btn-primary" onclick="alert('Works!')">Click Me</button>
+  </div>
+</body>
+</html>`;
+
+            // 1. View Mode (ID)
+            if (viewMode && id) {
+                fetch(`${APP_URL}?action=load&id=${id}`)
+                    .then(r => r.json())
+                    .then(d => {
+                        if(d.status==='success') enterViewMode(d.content, id);
+                        else alert('Project not found');
+                    });
+                return;
+            }
+
+            // 2. View Mode (Hash)
+            if (viewMode && hash) {
+                const content = decodeHash(hash);
+                enterViewMode(content, null);
+                return;
+            }
+
+            // 3. Editor Mode (ID)
+            if (id) {
+                loadFromCloud(id);
+                return;
+            }
+
+            // 4. Editor Mode (Hash/Local/Default)
+            document.getElementById('loading-overlay').style.display = 'none';
+            document.body.style.display = 'flex';
+            
+            if (hash) {
+                editor.value = decodeHash(hash);
+            } else {
+                const local = localStorage.getItem(AUTOSAVE_KEY);
+                editor.value = local || DEFAULT_CODE;
+                if(local) showToast('Restored from autosave');
+            }
+            updatePreview();
+        });
+    </script>
+</body>
+</html>
